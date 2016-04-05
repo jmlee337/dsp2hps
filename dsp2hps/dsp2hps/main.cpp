@@ -188,7 +188,7 @@ void writeBlockHeader(ofstream &outfile, int readBytes, bool last) {
     char *dataLengthBytes = (char *)&dataLength;
     outfile.write(dataLengthBytes, 4);
 
-    boost::endian::big_uint32_t lastByte = ((readBytes * 2) + dataLength) / 2;
+    boost::endian::big_uint32_t lastByte = (((readBytes * 2) + dataLength) / 2) - 1;
     char *lastByteBytes = (char *)&lastByte;
     outfile.write(lastByteBytes, 4);
 
