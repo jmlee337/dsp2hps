@@ -10,15 +10,231 @@ using namespace std;
 const int kBlockSize = 0x00010000;
 const int kReadSize = kBlockSize / 2;
 
-void writeHeader(ofstream &outfile);
-void writeChannelInfo(ifstream &dsp, ofstream &outfile);
-void writeBlockHeader(ofstream &outfile, int readBytes, bool last);
-void writeDecoderState(ifstream &dsp, ofstream &outfile);
-void writePad(ofstream &outfile);
-void writeBlockData(ifstream &dsp, ofstream &outfile, int readBytes);
-void validateDSPFiles(ifstream &left, ifstream &right);
-int calculateNumBlocks(int fileSize);
-int calculatePadded(int length);
+struct DecodeCoefficients {
+  boost::endian::big_int16_t decodeCoeffs[16];
+  boost::endian::big_int16_t hist1;
+  boost::endian::big_int16_t hist2;
+};
+
+// Pads a length to be 0x20/32 byte aligned
+int calculatePadded(int length) {
+  return ((length + 0x20 - 1) / 0x20) * 0x20;
+}
+
+// Header Format (0x10 bytes)
+// 0x00: magic constant
+// 0x08: sample rate
+// 0x0C: number of channels
+void writeHeader(ofstream &outfile) {
+  char magicWords[8] = { ' ', 'H', 'A', 'L', 'P', 'S', 'T', '\0' };
+  outfile.write(magicWords, 8);
+
+  boost::endian::big_uint32_t sampleRate = 32000;
+  char *sampleRateBytes = (char *)&sampleRate;
+  outfile.write(sampleRateBytes, 4);
+
+  boost::endian::big_uint32_t numChannels = 2;
+  char *numChannelsBytes = (char *)&numChannels;
+  outfile.write(numChannelsBytes, 4);
+}
+
+// Channel Info Format (0x38 bytes)
+// 0x00: length of largest block
+// 0x04: ??? (always 2)
+// 0x08: number of DSP samples
+// 0x0C: ??? (always 2)
+// 0x10: DSP decode coefficients
+// 0x30: initial DSP decoder state
+//
+// Does not mutate istream position
+DecodeCoefficients *writeChannelInfo(ifstream &dsp, ofstream &outfile) {
+  streampos pos = dsp.tellg();
+  dsp.seekg(0);
+
+  DecodeCoefficients *dc = new DecodeCoefficients();
+
+  boost::endian::big_uint32_t maxBlockLength = kBlockSize;
+  char *maxBlockLengthBytes = (char *)&maxBlockLength;
+  outfile.write(maxBlockLengthBytes, 4);
+
+  boost::endian::big_uint32_t unknownField1 = 2;
+  char *unknownField1Bytes = (char *)&unknownField1;
+  outfile.write(unknownField1Bytes, 4);
+
+  char numSamples[4];
+  dsp.read(numSamples, 4);
+  outfile.write(numSamples, 4);
+
+  boost::endian::big_uint32_t unknownField2 = 2;
+  char *unknownField2Bytes = (char *)&unknownField2;
+  outfile.write(unknownField2Bytes, 4);
+
+  dsp.seekg(0x1C);
+  dsp.read((char *)dc->decodeCoeffs, 0x20);
+  outfile.write((char *)dc->decodeCoeffs, 0x20);
+
+  // dsp position is 0x3C
+  char decodeState[8];
+  dsp.read(decodeState, 8);
+  outfile.write(decodeState, 8);
+
+  dsp.seekg(0x40);
+  dsp.read((char *)&dc->hist1, 2);
+  dsp.read((char *)&dc->hist2, 2);
+
+  dsp.seekg(pos);
+  return dc;
+}
+
+// Block Header Format (0x20 bytes)
+// 0x00: length of DSP data (length of block - length of header)
+// 0x04: last byte to read in the block???
+// 0x08: address of next block to read (offset from beginning of file)
+//
+// Does not mutate istream position
+void writeBlockHeader(ofstream &outfile, int readBytes, bool last) {
+  if (last) {
+    boost::endian::big_uint32_t dataLength = calculatePadded(readBytes) * 2;
+    char *dataLengthBytes = (char *)&dataLength;
+    outfile.write(dataLengthBytes, 4);
+
+    boost::endian::big_uint32_t lastByte = (((readBytes * 2) + dataLength) / 2) - 1;
+    char *lastByteBytes = (char *)&lastByte;
+    outfile.write(lastByteBytes, 4);
+
+    boost::endian::big_uint32_t nextBlock = 0x80;
+    char *nextBlockBytes = (char *)&nextBlock;
+    outfile.write(nextBlockBytes, 4);
+  }
+  else {
+    streampos pos = outfile.tellp();
+
+    boost::endian::big_uint32_t dataLength = readBytes * 2;
+    char *dataLengthBytes = (char *)&dataLength;
+    outfile.write(dataLengthBytes, 4);
+
+    boost::endian::big_uint32_t lastByte = dataLength - 1;
+    char *lastByteBytes = (char *)&lastByte;
+    outfile.write(lastByteBytes, 4);
+
+    boost::endian::big_uint32_t nextBlock = (int)pos + 0x20 + dataLength;
+    char *nextBlockBytes = (char *)&nextBlock;
+    outfile.write(nextBlockBytes, 4);
+  }
+}
+
+// Decoder State Format (0x08 bytes)
+// 0x00: P/S high byte
+// 0x01: P/S
+// 0x02: hist 1
+// 0x04: hist 2
+// 0x06: gain/scale??? (always 0)
+//
+// Does not mutate istream position
+void writeDecoderState(ifstream &dsp, ofstream &outfile,
+    boost::endian::big_int16_t hist1, boost::endian::big_int16_t hist2) {
+  streampos pos = dsp.tellg();
+
+  char zero = 0;
+  outfile.write(&zero, 1);
+
+  char PSByte;
+  dsp.read(&PSByte, 1);
+  outfile.write(&PSByte, 1);
+
+  outfile.write((char *)&hist1, 2);
+  outfile.write((char *)&hist2, 2);
+
+  outfile.write(&zero, 1);
+  outfile.write(&zero, 1);
+
+  dsp.seekg(pos);
+}
+
+void writePad(ofstream &outfile) {
+  char padBytes[4] = { 0, 0, 0, 0 };
+  outfile.write(padBytes, 4);
+}
+
+void *writeBlockData(ifstream &dsp, ofstream &outfile, int readBytes, DecodeCoefficients *dc) {
+  int paddedLength = calculatePadded(readBytes);
+  char *dspFrames = new char[paddedLength]();
+  dsp.read(dspFrames, readBytes);
+  outfile.write(dspFrames, paddedLength);
+
+  uint32_t scale;
+  int cIndex;
+  boost::endian::big_int16_t c1;
+  boost::endian::big_int16_t c2;
+  for (int i = 0; i < readBytes; i++) {
+    if (i % 8 == 0) {
+      scale = 1 << (dspFrames[i] & 0x0F);
+      cIndex = (dspFrames[i] >> 4) & 0x0F;
+      if (cIndex > 7) {
+        cerr << "DSP has PS with invalid cIndex in block ending at: " << hex << dsp.tellg() << dec;
+        exit(-1);
+      }
+      c1 = dc->decodeCoeffs[cIndex * 2];
+      c2 = dc->decodeCoeffs[cIndex * 2 + 1];
+    }
+    else {
+      int nibHi = (dspFrames[i] >> 4) & 0x0F;
+      if (nibHi > 7) {
+        nibHi -= 16;
+      }
+      int nibLo = dspFrames[i] & 0x0F;
+      if (nibLo > 7) {
+        nibLo -= 16;
+      }
+
+      int nibs[2] = { nibHi, nibLo };
+      for (int i = 0; i < 2; i++) {
+        boost::endian::big_int16_t sample;
+        boost::endian::big_int32_t sample32 = 
+          (((nibs[i] * scale) << 11) + (c1 * dc->hist1 + c2 * dc->hist2) + 1024) >> 11;
+        if (sample32 > 0x7FFF) {
+          sample = 0x7FFF;
+        } else if (sample32 < -0x8000) {
+          sample = -0x8000;
+        } else {
+          sample = sample32;
+        }
+
+        dc->hist2 = dc->hist1;
+        dc->hist1 = sample;
+      }
+    }
+  }
+  
+  delete dspFrames;
+  return 0;
+}
+
+void validateDSPFiles(ifstream &left, ifstream &right) {
+  streampos leftPos = left.tellg();
+  streampos rightPos = right.tellg();
+  left.seekg(0);
+  right.seekg(0);
+
+  char leftHeader[0x1C];
+  char rightHeader[0x1C];
+  left.read(leftHeader, 0x1C);
+  right.read(rightHeader, 0x1C);
+  if (strncmp(leftHeader, rightHeader, 0x1C)) {
+    cerr << "Input DSP file headers do not match";
+    exit(-1);
+  }
+
+  left.seekg(leftPos);
+  right.seekg(rightPos);
+}
+
+int calculateNumBlocks(int fileSize) {
+  int dspSize = fileSize - 0x60;
+
+  // ceiling of dspSize / readSize
+  return (dspSize + kReadSize - 1) / kReadSize;
+}
 
 int main(int argc, char *argv[]) {
   // Validate usage
@@ -75,11 +291,18 @@ int main(int argc, char *argv[]) {
   // 0x48: Right channel info
   // 0x80: Blocks begin
   writeHeader(outfile);
-  writeChannelInfo(left, outfile);
-  writeChannelInfo(right, outfile);
+  DecodeCoefficients *leftDc = writeChannelInfo(left, outfile);
+  DecodeCoefficients *rightDc = writeChannelInfo(right, outfile);
 
   left.seekg(0x60);
   right.seekg(0x60);
+
+
+  boost::endian::big_int16_t leftHist1 = leftDc->hist1;
+  boost::endian::big_int16_t leftHist2 = leftDc->hist2;
+  boost::endian::big_int16_t rightHist1 = rightDc->hist1;
+  boost::endian::big_int16_t rightHist2 = rightDc->hist2;
+  int numBlocks = calculateNumBlocks(fileSize);
 
   // Block Format
   // 0x00: Block Header
@@ -87,189 +310,29 @@ int main(int argc, char *argv[]) {
   // 0x14: Right DSP decoder state
   // 0x1C: Pad (always 0)
   // 0x20: DSP frames begin
-  int numBlocks = calculateNumBlocks(fileSize);
   for (int i = 0; i < numBlocks - 1; i++) {
     writeBlockHeader(outfile, kReadSize, false);
-    writeDecoderState(left, outfile);
-    writeDecoderState(right, outfile);
+    writeDecoderState(left, outfile, leftHist1, leftHist2);
+    writeDecoderState(right, outfile, rightHist1, rightHist2);
     writePad(outfile);
-    writeBlockData(left, outfile, kReadSize);
-    writeBlockData(right, outfile, kReadSize);
+    writeBlockData(left, outfile, kReadSize, leftDc);
+    leftHist1 = leftDc->hist1;
+    leftHist2 = leftDc->hist2;
+    writeBlockData(right, outfile, kReadSize, rightDc);
+    rightHist1 = rightDc->hist1;
+    rightHist2 = rightDc->hist2;
   }
   int bytesLeft = fileSize - left.tellg();
   writeBlockHeader(outfile, bytesLeft, true);
-  writeDecoderState(left, outfile);
-  writeDecoderState(right, outfile);
+  writeDecoderState(left, outfile, leftHist1, leftHist2);
+  writeDecoderState(right, outfile, rightHist1, rightHist2);
   writePad(outfile);
-  writeBlockData(left, outfile, bytesLeft);
-  writeBlockData(right, outfile, bytesLeft);
+  delete writeBlockData(left, outfile, bytesLeft, leftDc);
+  delete writeBlockData(right, outfile, bytesLeft, rightDc);
 
   left.close();
   right.close();
   outfile.close();
 
   return 0;
-}
-
-// Header Format (0x10 bytes)
-// 0x00: magic constant
-// 0x08: sample rate
-// 0x0C: number of channels
-void writeHeader(ofstream &outfile) {
-  char magicWords[8] = { ' ', 'H', 'A', 'L', 'P', 'S', 'T', '\0' };
-  outfile.write(magicWords, 8);
-
-  boost::endian::big_uint32_t sampleRate = 32000;
-  char *sampleRateBytes = (char *)&sampleRate;
-  outfile.write(sampleRateBytes, 4);
-
-  boost::endian::big_uint32_t numChannels = 2;
-  char *numChannelsBytes = (char *)&numChannels;
-  outfile.write(numChannelsBytes, 4);
-}
-
-// Channel Info Format (0x38 bytes)
-// 0x00: length of largest block
-// 0x04: ??? (always 2)
-// 0x08: number of DSP samples
-// 0x0C: ??? (always 2)
-// 0x10: DSP decode coefficients
-// 0x30: initial DSP decoder state
-//
-// Does not mutate istream position
-void writeChannelInfo(ifstream &dsp, ofstream &outfile) {
-  streampos pos = dsp.tellg();
-  dsp.seekg(0);
-
-  boost::endian::big_uint32_t maxBlockLength = kBlockSize;
-  char *maxBlockLengthBytes = (char *)&maxBlockLength;
-  outfile.write(maxBlockLengthBytes, 4);
-
-  boost::endian::big_uint32_t unknownField1 = 2;
-  char *unknownField1Bytes = (char *)&unknownField1;
-  outfile.write(unknownField1Bytes, 4);
-
-  char numSamples[4];
-  dsp.read(numSamples, 4);
-  outfile.write(numSamples, 4);
-
-  boost::endian::big_uint32_t unknownField2 = 2;
-  char *unknownField2Bytes = (char *)&unknownField2;
-  outfile.write(unknownField2Bytes, 4);
-
-  dsp.seekg(0x1C);
-  char decodeCoeffs[0x20];
-  dsp.read(decodeCoeffs, 0x20);
-  outfile.write(decodeCoeffs, 0x20);
-
-  // Initial Decoder State Format (0x08 bytes)
-  // 0x00: P/S high byte or gain??? (always 0)
-  // 0x02: Initial P/S (from first DSP frame header)
-  // 0x04: Initial hist1 (always 0)
-  // 0x06: Initial hist2 (always 0)
-  dsp.seekg(0x60);
-  char initialPS;
-  dsp.read(&initialPS, 1);
-  char decodeState[8] = { 0, 0, 0, initialPS, 0, 0, 0, 0 };
-  outfile.write(decodeState, 8);
-
-  dsp.seekg(pos);
-}
-
-// Block Header Format (0x20 bytes)
-// 0x00: length of DSP data (length of block - length of header)
-// 0x04: last byte to read in the block???
-// 0x08: address of next block to read (offset from beginning of file)
-//
-// Does not mutate istream position
-void writeBlockHeader(ofstream &outfile, int readBytes, bool last) {
-  if (last) {
-    boost::endian::big_uint32_t dataLength = calculatePadded(readBytes) * 2;
-    char *dataLengthBytes = (char *)&dataLength;
-    outfile.write(dataLengthBytes, 4);
-
-    boost::endian::big_uint32_t lastByte = (((readBytes * 2) + dataLength) / 2) - 1;
-    char *lastByteBytes = (char *)&lastByte;
-    outfile.write(lastByteBytes, 4);
-
-    boost::endian::big_uint32_t nextBlock = 0x80;
-    char *nextBlockBytes = (char *)&nextBlock;
-    outfile.write(nextBlockBytes, 4);
-  }
-  else {
-    streampos pos = outfile.tellp();
-
-    boost::endian::big_uint32_t dataLength = readBytes * 2;
-    char *dataLengthBytes = (char *)&dataLength;
-    outfile.write(dataLengthBytes, 4);
-
-    boost::endian::big_uint32_t lastByte = dataLength - 1;
-    char *lastByteBytes = (char *)&lastByte;
-    outfile.write(lastByteBytes, 4);
-
-    boost::endian::big_uint32_t nextBlock = (int)pos + 0x20 + dataLength;
-    char *nextBlockBytes = (char *)&nextBlock;
-    outfile.write(nextBlockBytes, 4);
-  }
-}
-
-// Decoder State Format (0x08 bytes)
-// 0x00: P/S high byte
-// 0x01: P/S
-// 0x02: hist 1
-// 0x04: hist 2
-// 0x06: gain/scale??? (always 0)
-//
-// Does not mutate istream position
-void writeDecoderState(ifstream &dsp, ofstream &outfile) {
-  streampos pos = dsp.tellg();
-
-  char PSByte;
-  dsp.read(&PSByte, 1);
-  char decoderState[8] = { 0, PSByte, 0, 0, 0, 0, 0, 0 };
-  outfile.write(decoderState, 8);
-
-  dsp.seekg(pos);
-}
-
-void writePad(ofstream &outfile) {
-  char padBytes[4] = { 0, 0, 0, 0 };
-  outfile.write(padBytes, 4);
-}
-
-void writeBlockData(ifstream &dsp, ofstream &outfile, int readBytes) {
-  int paddedLength = calculatePadded(readBytes);
-  char *dspFrames = new char[paddedLength]();
-  dsp.read(dspFrames, readBytes);
-  outfile.write(dspFrames, paddedLength);
-}
-
-void validateDSPFiles(ifstream &left, ifstream &right) {
-  streampos leftPos = left.tellg();
-  streampos rightPos = right.tellg();
-  left.seekg(0);
-  right.seekg(0);
-
-  char leftHeader[0x1C];
-  char rightHeader[0x1C];
-  left.read(leftHeader, 0x1C);
-  right.read(rightHeader, 0x1C);
-  if (strncmp(leftHeader, rightHeader, 0x1C)) {
-    cerr << "Input DSP file headers do not match";
-    exit(-1);
-  }
-
-  left.seekg(leftPos);
-  right.seekg(rightPos);
-}
-
-int calculateNumBlocks(int fileSize) {
-  int dspSize = fileSize - 0x60;
-
-  // ceiling of dspSize / readSize
-  return (dspSize + kReadSize - 1) / kReadSize;
-}
-
-int calculatePadded(int length) {
-  return ((length + 0x20 - 1) / 0x20) * 0x20;
 }
