@@ -1,4 +1,5 @@
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <string.h>
 #include <Windows.h>
@@ -158,10 +159,11 @@ void writePad(ofstream &outfile) {
 
 void *writeBlockData(ifstream &dsp, ofstream &outfile, int readBytes, DecodeCoefficients *dc) {
   int paddedLength = calculatePadded(readBytes);
-  char *dspFrames = new char[paddedLength]();
-  dsp.read(dspFrames, readBytes);
-  outfile.write(dspFrames, paddedLength);
+  char *signedFrames = new char[paddedLength]();
+  dsp.read(signedFrames, readBytes);
+  outfile.write(signedFrames, paddedLength);
 
+  unsigned char *dspFrames = (unsigned char *)signedFrames;
   uint32_t scale;
   int cIndex;
   boost::endian::big_int16_t c1;
@@ -190,8 +192,15 @@ void *writeBlockData(ifstream &dsp, ofstream &outfile, int readBytes, DecodeCoef
       int nibs[2] = { nibHi, nibLo };
       for (int i = 0; i < 2; i++) {
         boost::endian::big_int16_t sample;
-        boost::endian::big_int32_t sample32 = 
-          (((nibs[i] * scale) << 11) + (c1 * dc->hist1 + c2 * dc->hist2) + 1024) >> 11;
+
+		boost::endian::big_int32_t sample32 = nibs[i];
+		sample32 *= scale;
+		sample32 = sample32 << 11;
+		sample32 += c1 * dc->hist1;
+		sample32 += c2 * dc->hist2;
+		sample32 += 1024;
+		sample32 = sample32 >> 11;
+
         if (sample32 > 0x7FFF) {
           sample = 0x7FFF;
         } else if (sample32 < -0x8000) {
@@ -239,7 +248,7 @@ int calculateNumBlocks(int fileSize) {
 int main(int argc, char *argv[]) {
   // Validate usage
   if (argc != 4) {
-    cout << "three arguments required, found " << argc - 1;
+    cerr << "three arguments required, found " << argc - 1;
     return -1;
   }
 
