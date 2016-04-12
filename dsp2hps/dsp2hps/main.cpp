@@ -106,8 +106,7 @@ void writeBlockHeader(ofstream &outfile, int readBytes, bool last) {
     boost::endian::big_uint32_t nextBlock = 0x80;
     char *nextBlockBytes = (char *)&nextBlock;
     outfile.write(nextBlockBytes, 4);
-  }
-  else {
+  } else {
     streampos pos = outfile.tellp();
 
     boost::endian::big_uint32_t dataLength = readBytes * 2;
@@ -159,11 +158,10 @@ void writePad(ofstream &outfile) {
 
 void *writeBlockData(ifstream &dsp, ofstream &outfile, int readBytes, DecodeCoefficients *dc) {
   int paddedLength = calculatePadded(readBytes);
-  char *signedFrames = new char[paddedLength]();
-  dsp.read(signedFrames, readBytes);
-  outfile.write(signedFrames, paddedLength);
+  char *dspFrames = new char[paddedLength]();
+  dsp.read(dspFrames, readBytes);
+  outfile.write(dspFrames, paddedLength);
 
-  unsigned char *dspFrames = (unsigned char *)signedFrames;
   uint32_t scale;
   int cIndex;
   boost::endian::big_int16_t c1;
@@ -178,8 +176,7 @@ void *writeBlockData(ifstream &dsp, ofstream &outfile, int readBytes, DecodeCoef
       }
       c1 = dc->decodeCoeffs[cIndex * 2];
       c2 = dc->decodeCoeffs[cIndex * 2 + 1];
-    }
-    else {
+	} else {
       int nibHi = (dspFrames[i] >> 4) & 0x0F;
       if (nibHi > 7) {
         nibHi -= 16;
