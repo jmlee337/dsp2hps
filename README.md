@@ -2,7 +2,7 @@
 I heavily reworked MeleeHps to be way more user friendly and produce slightly better results
 seriously, it now literally takes **5 seconds** to go from audiofile.anyformat to audiofile.hps
 
-**[Download](https://drive.google.com/open?id=0B79OwbM8T752UlZTdWRjRTVOZEk)**
+**[Download](https://github.com/jmlee337/dsp2hps/releases/tag/v3)**
 
 changelog v3 (2016/04/13):
 
