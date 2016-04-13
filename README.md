@@ -66,8 +66,9 @@ the original main.asm used the first block header in the file for every single b
 * **output file names**
 just a small quality of life edit. the output file now has the format [inputfilename].hps, so songname.mp3 would produce songname.mp3.hps as the output. This means you can run a bunch in a row and move out all your hps files once you're done
 
-**what are you working on next?**
+## **what are you working on next?**
 
 * ~~rewriting all the main.asm + assembler business in an actual programming language to make the world a little more sane~~
 * ~~further parameterizing so you'll be able to drag all the files onto run.bat and convert all of them in one go~~
 * ~~writing hist1 and hist2 in the HSP headers correctly to remove popping all together~~
+* Adding support for custom loops (loop points at any arbitrary sample, not just block boundaries)
