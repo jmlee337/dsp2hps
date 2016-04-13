@@ -2,7 +2,7 @@
 I heavily reworked MeleeHps to be way more user friendly and produce slightly better results
 seriously, it now literally takes **5 seconds** to go from audiofile.anyformat to audiofile.hps
 
-**[Download]('https://drive.google.com/open?id=0B79OwbM8T752UlZTdWRjRTVOZEk')**
+**[Download](https://drive.google.com/open?id=0B79OwbM8T752UlZTdWRjRTVOZEk)**
 
 changelog v3 (2016/04/13):
 
@@ -14,7 +14,7 @@ changelog v3 (2016/04/13):
 changelog v2 (2016/04/01):
 
 * you can convert files in batch! Just drag them all onto run.bat
-* [here's a vid]('https://drive.google.com/open?id=0B79OwbM8T752T0FNSTFld01MU0U')
+* [here's a vid](https://drive.google.com/open?id=0B79OwbM8T752T0FNSTFld01MU0U)
 
 changelog v1 (2016/03/31):
 
@@ -28,7 +28,7 @@ changelog v1 (2016/03/31):
 ## **How do I use this?**
 how to use (video form):
 
-* [here you go]('https://drive.google.com/open?id=0B79OwbM8T752YW9vMHhjUXcxOFE')
+* [here you go](https://drive.google.com/open?id=0B79OwbM8T752YW9vMHhjUXcxOFE)
 
 how to use (text form):
 * move your audio file (in any format) to the MeleeHps folder
