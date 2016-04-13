@@ -245,7 +245,7 @@ int calculateNumBlocks(int fileSize) {
 int main(int argc, char *argv[]) {
   // Validate usage
   if (argc != 4) {
-    cerr << "three arguments required, found " << argc - 1;
+    cerr << "Usage: dsp2hps.exe left_dsp right_dsp output_hps";
     return -1;
   }
 
