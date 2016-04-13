@@ -9,7 +9,7 @@ changelog v3 (2016/04/13):
 * rewrote the conversion from DSP to HPS in C++
 * since this is sufficiently removed from what MeleeHps was, I'm calling my tool 'dsp2hps'
 * calculates all block header values correctly to remove all pops from the final audio. to my knowledge, this is the only tool to write the correct P/S, hist1, and hist2 values in the HPS block headers
-* I've uploaded my code to github: [URL]https://github.com/jmlee337/dsp2hps[/URL]
+* I've uploaded my code to github: https://github.com/jmlee337/dsp2hps
 
 changelog v2 (2016/04/01):
 
@@ -31,10 +31,10 @@ how to use (video form):
 * [here you go]('https://drive.google.com/open?id=0B79OwbM8T752YW9vMHhjUXcxOFE')
 
 how to use (text form):
-1. move your audio file (in any format) to the MeleeHps folder
-2. drag it onto 'run.bat'
-3. that's it.
-4. you can also invoke from the command line: normalloop.bat myaudiofile.ogg
+* move your audio file (in any format) to the MeleeHps folder
+* drag it onto 'run.bat'
+* that's it.
+* you can also invoke from the command line: normalloop.bat myaudiofile.ogg
 
 That's so easy! What's the catch??
 
