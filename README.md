@@ -32,7 +32,7 @@ how to use (video form):
 
 how to use (text form):
 * move your audio file (in any format) to the MeleeHps folder
-* drag it onto 'run.bat'
+* drag it onto 'normalloop.bat'
 * that's it.
 * you can also invoke from the command line: normalloop.bat myaudiofile.ogg
 
