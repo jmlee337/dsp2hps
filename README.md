@@ -48,19 +48,19 @@ i included ffmpeg, which can convert from any format to 16bit WAV 32000 kHz from
 
 
 * **hex editors**
-i configured main.asm to automatically add the correct padding. I discovered that DSP data must be 32-byte aligned! 16-byte alignment also seemed to work for me, but all the stock HSPs are 32-byte aligned. This must be why achilles sometimes found that adding a pad in a hex editor didn't always work the first time.
+dsp2hps automatically adds the correct padding. I discovered that DSP data must be 32-byte aligned! 16-byte alignment also seemed to work for me, but all the stock HSPs are 32-byte aligned. This must be why achilles sometimes found that adding a pad in a hex editor didn't always work the first time.
 
 
 * **samples/blocks**
-well simply, that data is all calculable from the DSP files themselves. I had to do a horrendous hack to make it work though (the batch file replaces the first line of main.asm, that's why SampleLength is defined there)
+well simply, that data is all calculable from the DSP files themselves.
 
 
 * **drag and drop**
-since you don't have to edit the DSPs or main.asm before running the assembler, the whole conversion process can be done in one batch script
+the whole conversion process can be done in one batch script
 
 
 * **more accurate block headers**
-the original main.asm used the first block header in the file for every single block. I made it use the correct block header, but there's two values (hist1 and hist2) that actually require decoding the DSP block to set correctly. This makes any audible pops fewer and smaller, but does not solve the problem completely. I included the most complete documentation I could assemble for the format of HSP audio files in main.asm
+the original MeleeHps used the first block header in the file for every single block. dsp2hps writes every block header 100% correctly, including the hist1 and hist2 values that require decoding the DSP block to set correctly. This completely eliminates the auditory pops common with the original MeleeHps. I included the most complete documentation I could assemble for the format of HSP audio files in the code
 
 
 * **output file names**
