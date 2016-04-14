@@ -4,17 +4,22 @@
 #include <string.h>
 #include <Windows.h>
 #include <boost/endian/arithmetic.hpp>
+#include <boost/program_options.hpp>
 #include <sys/stat.h>
 
 using namespace std;
 
+namespace po = boost::program_options;
+namespace en = boost::endian;
+
+const en::big_uint32_t kDefaultSampleRate = 32000;
 const int kBlockSize = 0x00010000;
 const int kReadSize = kBlockSize / 2;
 
 struct DecodeCoefficients {
-  boost::endian::big_int16_t decodeCoeffs[16];
-  boost::endian::big_int16_t hist1;
-  boost::endian::big_int16_t hist2;
+  en::big_int16_t decodeCoeffs[16];
+  en::big_int16_t hist1;
+  en::big_int16_t hist2;
 };
 
 // Pads a length to be 0x20/32 byte aligned
@@ -26,15 +31,14 @@ int calculatePadded(int length) {
 // 0x00: magic constant
 // 0x08: sample rate
 // 0x0C: number of channels
-void writeHeader(ofstream &outfile) {
+void writeHeader(ofstream &outfile, en::big_uint32_t sampleRate) {
   char magicWords[8] = { ' ', 'H', 'A', 'L', 'P', 'S', 'T', '\0' };
   outfile.write(magicWords, 8);
 
-  boost::endian::big_uint32_t sampleRate = 32000;
   char *sampleRateBytes = (char *)&sampleRate;
   outfile.write(sampleRateBytes, 4);
 
-  boost::endian::big_uint32_t numChannels = 2;
+  en::big_uint32_t numChannels = 2;
   char *numChannelsBytes = (char *)&numChannels;
   outfile.write(numChannelsBytes, 4);
 }
@@ -54,11 +58,11 @@ DecodeCoefficients *writeChannelInfo(ifstream &dsp, ofstream &outfile) {
 
   DecodeCoefficients *dc = new DecodeCoefficients();
 
-  boost::endian::big_uint32_t maxBlockLength = kBlockSize;
+  en::big_uint32_t maxBlockLength = kBlockSize;
   char *maxBlockLengthBytes = (char *)&maxBlockLength;
   outfile.write(maxBlockLengthBytes, 4);
 
-  boost::endian::big_uint32_t unknownField1 = 2;
+  en::big_uint32_t unknownField1 = 2;
   char *unknownField1Bytes = (char *)&unknownField1;
   outfile.write(unknownField1Bytes, 4);
 
@@ -66,7 +70,7 @@ DecodeCoefficients *writeChannelInfo(ifstream &dsp, ofstream &outfile) {
   dsp.read(numSamples, 4);
   outfile.write(numSamples, 4);
 
-  boost::endian::big_uint32_t unknownField2 = 2;
+  en::big_uint32_t unknownField2 = 2;
   char *unknownField2Bytes = (char *)&unknownField2;
   outfile.write(unknownField2Bytes, 4);
 
@@ -95,29 +99,29 @@ DecodeCoefficients *writeChannelInfo(ifstream &dsp, ofstream &outfile) {
 // Does not mutate istream position
 void writeBlockHeader(ofstream &outfile, int readBytes, bool last) {
   if (last) {
-    boost::endian::big_uint32_t dataLength = calculatePadded(readBytes) * 2;
+    en::big_uint32_t dataLength = calculatePadded(readBytes) * 2;
     char *dataLengthBytes = (char *)&dataLength;
     outfile.write(dataLengthBytes, 4);
 
-    boost::endian::big_uint32_t lastByte = (((readBytes * 2) + dataLength) / 2) - 1;
+    en::big_uint32_t lastByte = (((readBytes * 2) + dataLength) / 2) - 1;
     char *lastByteBytes = (char *)&lastByte;
     outfile.write(lastByteBytes, 4);
 
-    boost::endian::big_uint32_t nextBlock = 0x80;
+    en::big_uint32_t nextBlock = 0x80;
     char *nextBlockBytes = (char *)&nextBlock;
     outfile.write(nextBlockBytes, 4);
   } else {
     streampos pos = outfile.tellp();
 
-    boost::endian::big_uint32_t dataLength = readBytes * 2;
+    en::big_uint32_t dataLength = readBytes * 2;
     char *dataLengthBytes = (char *)&dataLength;
     outfile.write(dataLengthBytes, 4);
 
-    boost::endian::big_uint32_t lastByte = dataLength - 1;
+    en::big_uint32_t lastByte = dataLength - 1;
     char *lastByteBytes = (char *)&lastByte;
     outfile.write(lastByteBytes, 4);
 
-    boost::endian::big_uint32_t nextBlock = (int)pos + 0x20 + dataLength;
+    en::big_uint32_t nextBlock = (int)pos + 0x20 + dataLength;
     char *nextBlockBytes = (char *)&nextBlock;
     outfile.write(nextBlockBytes, 4);
   }
@@ -132,7 +136,7 @@ void writeBlockHeader(ofstream &outfile, int readBytes, bool last) {
 //
 // Does not mutate istream position
 void writeDecoderState(ifstream &dsp, ofstream &outfile,
-    boost::endian::big_int16_t hist1, boost::endian::big_int16_t hist2) {
+    en::big_int16_t hist1, en::big_int16_t hist2) {
   streampos pos = dsp.tellg();
 
   char zero = 0;
@@ -164,8 +168,8 @@ void *writeBlockData(ifstream &dsp, ofstream &outfile, int readBytes, DecodeCoef
 
   uint32_t scale;
   int cIndex;
-  boost::endian::big_int16_t c1;
-  boost::endian::big_int16_t c2;
+  en::big_int16_t c1;
+  en::big_int16_t c2;
   for (int i = 0; i < readBytes; i++) {
     if (i % 8 == 0) {
       scale = 1 << (dspFrames[i] & 0x0F);
@@ -188,9 +192,9 @@ void *writeBlockData(ifstream &dsp, ofstream &outfile, int readBytes, DecodeCoef
 
       int nibs[2] = { nibHi, nibLo };
       for (int i = 0; i < 2; i++) {
-        boost::endian::big_int16_t sample;
+        en::big_int16_t sample;
 
-		boost::endian::big_int32_t sample32 = nibs[i];
+		en::big_int32_t sample32 = nibs[i];
 		sample32 *= scale;
 		sample32 = sample32 << 11;
 		sample32 += c1 * dc->hist1;
@@ -243,21 +247,44 @@ int calculateNumBlocks(int fileSize) {
 }
 
 int main(int argc, char *argv[]) {
-  // Validate usage
-  if (argc != 4) {
-    cerr << "Usage: dsp2hps.exe left_dsp right_dsp output_hps";
+  string leftFileName;
+  string rightFileName;
+  string outFileName;
+  en::big_uint32_t sampleRate;
+
+  po::options_description desc("Options");
+  desc.add_options()
+    ("help", "help")
+    ("left_dsp", po::value<string>(&leftFileName)->required(), "left dsp file")
+    ("right_dsp", po::value<string>(&rightFileName)->required(), "right dsp file")
+    ("output,o", po::value<string>(&outFileName)->required(), "output file")
+    ("sample_rate", po::value<en::big_uint32_t>(&sampleRate), "set sample rate (default 32000)");
+  po::variables_map vm;
+  try {
+    po::store(po::parse_command_line(argc, argv, desc), vm);
+    po::notify(vm);
+    if (vm.count("help")) {
+      cout << desc << "\n";
+      return 0;
+    }
+    if (!vm.count("sample_rate")) {
+      sampleRate = kDefaultSampleRate;
+    }
+  } catch (po::error &e) {
+    cerr << e.what() << endl << endl;
+    cerr << desc << endl;
     return -1;
   }
 
   // Validate input DSP file sizes
   struct stat leftFile;
-  if (stat(argv[1], &leftFile) != 0) {
-    cerr << "Failed to stat file, " << argv[1] << ": " << GetLastError();
+  if (stat(leftFileName.c_str(), &leftFile) != 0) {
+    cerr << "Failed to stat file, " << leftFileName << ": " << GetLastError();
     return -1;
   }
   struct stat rightFile;
-  if (stat(argv[2], &rightFile) != 0) {
-    cerr << "Failed to stat file, " << argv[2] << ": " << GetLastError();
+  if (stat(rightFileName.c_str(), &rightFile) != 0) {
+    cerr << "Failed to stat file, " << rightFileName << ": " << GetLastError();
     return -1;
   }
   if (leftFile.st_size != rightFile.st_size) {
@@ -272,22 +299,22 @@ int main(int argc, char *argv[]) {
   int fileSize = leftFile.st_size;
 
   // Validate DSP file headers
-  ifstream left(argv[1], ios::in | ios::binary);
+  ifstream left(leftFileName, ios::in | ios::binary);
   if (!left.is_open()) {
-    cerr << "Failed to open file, " << argv[1] << " for reading: " << GetLastError();
+    cerr << "Failed to open file, " << leftFileName << " for reading: " << GetLastError();
     return -1;
   }
-  ifstream right(argv[2], ios::in | ios::binary);
+  ifstream right(rightFileName, ios::in | ios::binary);
   if (!left.is_open()) {
-    cerr << "Failed to open file, " << argv[2] << " for reading: " << GetLastError();
+    cerr << "Failed to open file, " << rightFileName << " for reading: " << GetLastError();
     return -1;
   }
   validateDSPFiles(left, right);
 
   // Open output file
-  ofstream outfile(argv[3], ios::out | ios::binary);
+  ofstream outfile(outFileName, ios::out | ios::binary);
   if (!outfile.is_open()) {
-    cerr << "Failed to open file, " << argv[3] << " for writing: " << GetLastError();
+    cerr << "Failed to open file, " << outFileName << " for writing: " << GetLastError();
     return -1;
   }
 
@@ -296,7 +323,7 @@ int main(int argc, char *argv[]) {
   // 0x10: Left channel info
   // 0x48: Right channel info
   // 0x80: Blocks begin
-  writeHeader(outfile);
+  writeHeader(outfile, sampleRate);
   DecodeCoefficients *leftDc = writeChannelInfo(left, outfile);
   DecodeCoefficients *rightDc = writeChannelInfo(right, outfile);
 
@@ -304,10 +331,10 @@ int main(int argc, char *argv[]) {
   right.seekg(0x60);
 
 
-  boost::endian::big_int16_t leftHist1 = leftDc->hist1;
-  boost::endian::big_int16_t leftHist2 = leftDc->hist2;
-  boost::endian::big_int16_t rightHist1 = rightDc->hist1;
-  boost::endian::big_int16_t rightHist2 = rightDc->hist2;
+  en::big_int16_t leftHist1 = leftDc->hist1;
+  en::big_int16_t leftHist2 = leftDc->hist2;
+  en::big_int16_t rightHist1 = rightDc->hist1;
+  en::big_int16_t rightHist2 = rightDc->hist2;
   int numBlocks = calculateNumBlocks(fileSize);
 
   // Block Format
