@@ -1,5 +1,5 @@
 # dsp2hps
-I heavily reworked MeleeHps to be way more user friendly and produce slightly better results
+I heavily reworked MeleeHps to be way more user friendly and produce slightly better results  
 seriously, it now literally takes **5 seconds** to go from audiofile.anyformat to audiofile.hps
 
 **[Download](https://github.com/jmlee337/dsp2hps/releases)**
@@ -10,10 +10,11 @@ how to use (video form):
 * [here you go](https://drive.google.com/open?id=0B79OwbM8T752Ukp6NUdpNlNlLTg)
 
 how to use (text form):
-* move your audio file (in any format) to the MeleeHps folder
-* drag it onto 'normalloop.bat'
-* that's it.
-* you can also invoke from the command line: normalloop.bat myaudiofile.ogg
+
+1. move your audio file (in any format) to the MeleeHps folder  
+2. drag it onto 'normalloop.bat'  
+3. that's it.  
+4. you can also invoke from the command line: normalloop.bat myaudiofile.ogg
 
 That's so easy! What's the catch??
 
