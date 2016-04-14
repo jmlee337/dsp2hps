@@ -4,26 +4,6 @@ seriously, it now literally takes **5 seconds** to go from audiofile.anyformat t
 
 **[Download](https://github.com/jmlee337/dsp2hps/releases)**
 
-changelog v3 (2016/04/13):
-
-* rewrote the conversion from DSP to HPS in C++
-* since this is sufficiently removed from what MeleeHps was, I'm calling my tool 'dsp2hps'
-* calculates all block header values correctly to remove all pops from the final audio. to my knowledge, this is the only tool to write the correct P/S, hist1, and hist2 values in the HPS block headers
-* I've uploaded my code to github: https://github.com/jmlee337/dsp2hps
-
-changelog v2 (2016/04/01):
-
-* you can convert files in batch! Just drag them all onto run.bat
-
-changelog v1 (2016/03/31):
-
-* no more opening with audacity and clicking and saving to format the file correctly
-* no more fiddling with hex editors
-* no more copy pasting samples-this and blocks-that
-* drag-and-drop or invoke from the command line
-* more accurate block headers mean fewer/smaller pops during playback
-* parameterized output file names let you do a bunch in a row without overwriting your output
-
 ## **How do I use this?**
 how to use (video form):
 
@@ -46,6 +26,21 @@ That's so easy! What's the catch??
 * ~~further parameterizing so you'll be able to drag all the files onto run.bat and convert all of them in one go~~
 * ~~writing hist1 and hist2 in the HSP headers correctly to remove popping all together~~
 * Adding support for custom loops (loop points at any arbitrary sample, not just block boundaries)
+
+## Historical Changelog
+
+changelog v2 (2016/04/01):
+
+* you can convert files in batch! Just drag them all onto run.bat
+
+changelog v1 (2016/03/31):
+
+* no more opening with audacity and clicking and saving to format the file correctly
+* no more fiddling with hex editors
+* no more copy pasting samples-this and blocks-that
+* drag-and-drop or invoke from the command line
+* more accurate block headers mean fewer/smaller pops during playback
+* parameterized output file names let you do a bunch in a row without overwriting your output
 
 ## **How'd you do it??? (technical details)**
 
