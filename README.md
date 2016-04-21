@@ -1,15 +1,34 @@
 # dsp2hps
-I heavily reworked MeleeHps to be way more user friendly and produce slightly better results
+I heavily reworked MeleeHps to be way more user friendly and produce slightly better results  
 seriously, it now literally takes **5 seconds** to go from audiofile.anyformat to audiofile.hps
 
 **[Download](https://github.com/jmlee337/dsp2hps/releases)**
 
-changelog v3 (2016/04/13):
+## **How do I use this?**
+how to use (video form):
 
-* rewrote the conversion from DSP to HPS in C++
-* since this is sufficiently removed from what MeleeHps was, I'm calling my tool 'dsp2hps'
-* calculates all block header values correctly to remove all pops from the final audio. to my knowledge, this is the only tool to write the correct P/S, hist1, and hist2 values in the HPS block headers
-* I've uploaded my code to github: https://github.com/jmlee337/dsp2hps
+* [here you go](https://drive.google.com/open?id=0B79OwbM8T752Ukp6NUdpNlNlLTg)
+
+how to use (text form):
+
+1. move your audio file (in any format) to the MeleeHps folder  
+2. drag it onto 'normalloop.bat'  
+3. that's it.  
+4. you can also invoke from the command line: normalloop.bat myaudiofile.ogg
+
+That's so easy! What's the catch??
+
+* you still have to make sure your source audio file loops correctly
+* this only works for 'normal' loops, not 'custom' loops
+
+## **What are you working on next?**
+
+* ~~rewriting all the main.asm + assembler business in an actual programming language to make the world a little more sane~~
+* ~~further parameterizing so you'll be able to drag all the files onto run.bat and convert all of them in one go~~
+* ~~writing hist1 and hist2 in the HSP headers correctly to remove popping all together~~
+* Adding support for custom loops (loop points at any arbitrary sample, not just block boundaries)
+
+## Historical Changelog
 
 changelog v2 (2016/04/01):
 
@@ -23,22 +42,6 @@ changelog v1 (2016/03/31):
 * drag-and-drop or invoke from the command line
 * more accurate block headers mean fewer/smaller pops during playback
 * parameterized output file names let you do a bunch in a row without overwriting your output
-
-## **How do I use this?**
-how to use (video form):
-
-* [here you go](https://drive.google.com/open?id=0B79OwbM8T752Ukp6NUdpNlNlLTg)
-
-how to use (text form):
-* move your audio file (in any format) to the MeleeHps folder
-* drag it onto 'normalloop.bat'
-* that's it.
-* you can also invoke from the command line: normalloop.bat myaudiofile.ogg
-
-That's so easy! What's the catch??
-
-* you still have to make sure your source audio file loops correctly
-* this only works for 'normal' loops, not 'custom' loops
 
 ## **How'd you do it??? (technical details)**
 
@@ -64,10 +67,3 @@ the original MeleeHps used the first block header in the file for every single b
 
 * **output file names**
 just a small quality of life edit. the output file now has the format [inputfilename].hps, so songname.mp3 would produce songname.mp3.hps as the output. This means you can run a bunch in a row and move out all your hps files once you're done
-
-## **what are you working on next?**
-
-* ~~rewriting all the main.asm + assembler business in an actual programming language to make the world a little more sane~~
-* ~~further parameterizing so you'll be able to drag all the files onto run.bat and convert all of them in one go~~
-* ~~writing hist1 and hist2 in the HSP headers correctly to remove popping all together~~
-* Adding support for custom loops (loop points at any arbitrary sample, not just block boundaries)
