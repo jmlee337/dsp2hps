@@ -5,16 +5,26 @@ seriously, it now literally takes **5 seconds** to go from audiofile.anyformat t
 **[Download](https://github.com/jmlee337/dsp2hps/releases)**
 
 ## **How do I use this?**
-how to use (video form):
+vids:
 
-* [here you go](https://drive.google.com/open?id=0B79OwbM8T752Ukp6NUdpNlNlLTg)
+* [normal loops](https://drive.google.com/open?id=0B79OwbM8T752Ukp6NUdpNlNlLTg)
+* [custom loops](https://drive.google.com/open?id=0B79OwbM8T752TkVIR1JiOXJFd2M)
 
-how to use (text form):
+normal loops:
 
-1. move your audio file (in any format) to the MeleeHps folder  
-2. drag it onto 'normal_stereo.bat'  
-3. that's it.  
-4. you can also invoke from the command line: normal_stereo.bat myaudiofile.ogg
+1. drag your audio file onto 'normal_stereo.bat'  
+2. that's it.  
+3. you can also invoke from the command line: normal_stereo.bat myaudiofile.ogg
+
+custom loops:
+
+1. set the --loop_point parameter in 'custom_stereo.bat' and save  
+2. drag your audio file onto 'custom_stereo.bat'  
+3. that's it.
+
+mono sources:
+
+1. use 'normal_mono.bat' and 'custom_mono.bat' instead
 
 That's so easy! What's the catch??
 
