@@ -12,21 +12,20 @@ how to use (video form):
 how to use (text form):
 
 1. move your audio file (in any format) to the MeleeHps folder  
-2. drag it onto 'normalloop.bat'  
+2. drag it onto 'normal_stereo.bat'  
 3. that's it.  
-4. you can also invoke from the command line: normalloop.bat myaudiofile.ogg
+4. you can also invoke from the command line: normal_stereo.bat myaudiofile.ogg
 
 That's so easy! What's the catch??
 
 * you still have to make sure your source audio file loops correctly
-* this only works for 'normal' loops, not 'custom' loops
 
 ## **What are you working on next?**
 
 * ~~rewriting all the main.asm + assembler business in an actual programming language to make the world a little more sane~~
 * ~~further parameterizing so you'll be able to drag all the files onto run.bat and convert all of them in one go~~
 * ~~writing hist1 and hist2 in the HSP headers correctly to remove popping all together~~
-* Adding support for custom loops (loop points at any arbitrary sample, not just block boundaries)
+* ~~Adding support for custom loops (loop points at any arbitrary sample, not just block boundaries)~~
 
 ## Historical Changelog
 
