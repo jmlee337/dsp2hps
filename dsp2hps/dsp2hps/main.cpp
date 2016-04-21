@@ -1,3 +1,4 @@
+#include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -15,6 +16,7 @@ namespace en = boost::endian;
 const en::big_uint32_t kDefaultSampleRate = 32000;
 const int kBlockSize = 0x00010000;
 const int kReadSize = kBlockSize / 2;
+const int kBytesPerBlock = kBlockSize + 0x20;
 
 struct DecodeCoefficients {
   en::big_int16_t decodeCoeffs[16];
@@ -97,8 +99,9 @@ DecodeCoefficients *writeChannelInfo(ifstream &dsp, ofstream &outfile) {
 // 0x08: address of next block to read (offset from beginning of file)
 //
 // Does not mutate istream position
-void writeBlockHeader(ofstream &outfile, int readBytes, bool last) {
-  if (last) {
+// loopPoint specifies that this is the last block in the file and where to loop to if not null.
+void writeBlockHeader(ofstream &outfile, int readBytes, en::big_uint32_t *loopBlock) {
+  if (loopBlock) {
     en::big_uint32_t dataLength = calculatePadded(readBytes) * 2;
     char *dataLengthBytes = (char *)&dataLength;
     outfile.write(dataLengthBytes, 4);
@@ -107,8 +110,7 @@ void writeBlockHeader(ofstream &outfile, int readBytes, bool last) {
     char *lastByteBytes = (char *)&lastByte;
     outfile.write(lastByteBytes, 4);
 
-    en::big_uint32_t nextBlock = 0x80;
-    char *nextBlockBytes = (char *)&nextBlock;
+    char *nextBlockBytes = (char *)loopBlock;
     outfile.write(nextBlockBytes, 4);
   } else {
     streampos pos = outfile.tellp();
@@ -239,11 +241,40 @@ void validateDSPFiles(ifstream &left, ifstream &right) {
   right.seekg(rightPos);
 }
 
-int calculateNumBlocks(int fileSize) {
+int calculateNumBlocks(int fileSize, en::big_uint32_t loopBlock) {
   int dspSize = fileSize - 0x60;
+
+  int shortBlockBytes = (loopBlock - 0x80) % kBytesPerBlock;
+  if (shortBlockBytes > 0) {
+    dspSize -= ((shortBlockBytes - 0x20) / 2);
+    return ((dspSize + kReadSize - 1) / kReadSize) + 1;
+  }
 
   // ceiling of dspSize / readSize
   return (dspSize + kReadSize - 1) / kReadSize;
+}
+
+// Calculates the beginning address of the loop block
+en::big_uint32_t calculateLoopBlock(double loopPoint, en::big_uint32_t sampleRate) {
+  int loopSample = round(loopPoint * sampleRate);
+
+  // round loop sample to nearest multiple of 56
+  loopSample = loopSample + (56 / 2);
+  loopSample -= loopSample % 56;
+
+  // (kReadSize must be a multiple of 32, so no fraction can be truncated here)
+  // (samplesPerBlock will be a multiple of 56)
+  int samplesPerBlock = kReadSize * 14 / 8;
+
+  int blockBefore = floor(loopSample / samplesPerBlock);
+  int addressBefore = blockBefore * kBytesPerBlock + 0x80;
+
+  // remainingSamples will be a multiple of 56
+  // remainingBytes will be a multiple of 32
+  int remainingSamples = loopSample % samplesPerBlock;
+  int remainingBytes = 0x20 + (2 * (remainingSamples * 8 / 14));
+
+  return addressBefore + remainingBytes;
 }
 
 int main(int argc, char *argv[]) {
@@ -251,20 +282,22 @@ int main(int argc, char *argv[]) {
   string rightFileName;
   string outFileName;
   en::big_uint32_t sampleRate;
+  double loopPoint;
 
   po::options_description desc("Options");
   desc.add_options()
     ("help", "help")
-    ("left_dsp", po::value<string>(&leftFileName)->required(), "left dsp file")
-    ("right_dsp", po::value<string>(&rightFileName)->required(), "right dsp file")
+    ("left_dsp,l", po::value<string>(&leftFileName)->required(), "left dsp file")
+    ("right_dsp,r", po::value<string>(&rightFileName)->required(), "right dsp file")
     ("output,o", po::value<string>(&outFileName)->required(), "output file")
-    ("sample_rate", po::value<en::big_uint32_t>(&sampleRate), "set sample rate (default 32000)");
+    ("sample_rate", po::value<en::big_uint32_t>(&sampleRate), "set sample rate (default 32000)")
+    ("loop_point", po::value<double>(&loopPoint), "set a custom loop point in seconds");
   po::variables_map vm;
   try {
     po::store(po::parse_command_line(argc, argv, desc), vm);
     po::notify(vm);
     if (vm.count("help")) {
-      cout << desc << "\n";
+      cout << desc << endl;
       return 0;
     }
     if (!vm.count("sample_rate")) {
@@ -335,7 +368,12 @@ int main(int argc, char *argv[]) {
   en::big_int16_t leftHist2 = leftDc->hist2;
   en::big_int16_t rightHist1 = rightDc->hist1;
   en::big_int16_t rightHist2 = rightDc->hist2;
-  int numBlocks = calculateNumBlocks(fileSize);
+
+  en::big_uint32_t loopBlock = 0x80;
+  if (vm.count("loop_point")) {
+    loopBlock = calculateLoopBlock(loopPoint, sampleRate);
+  }
+  int numBlocks = calculateNumBlocks(fileSize, loopBlock);
 
   // Block Format
   // 0x00: Block Header
@@ -344,19 +382,26 @@ int main(int argc, char *argv[]) {
   // 0x1C: Pad (always 0)
   // 0x20: DSP frames begin
   for (int i = 0; i < numBlocks - 1; i++) {
-    writeBlockHeader(outfile, kReadSize, false);
+    int readBytes = kReadSize;
+
+    int pos = (int)outfile.tellp();
+    if (pos < loopBlock && pos + kBytesPerBlock > loopBlock) {
+      readBytes = (loopBlock - pos - 0x20) / 2;
+    }
+
+    writeBlockHeader(outfile, readBytes, NULL);
     writeDecoderState(left, outfile, leftHist1, leftHist2);
     writeDecoderState(right, outfile, rightHist1, rightHist2);
     writePad(outfile);
-    writeBlockData(left, outfile, kReadSize, leftDc);
+    writeBlockData(left, outfile, readBytes, leftDc);
     leftHist1 = leftDc->hist1;
     leftHist2 = leftDc->hist2;
-    writeBlockData(right, outfile, kReadSize, rightDc);
+    writeBlockData(right, outfile, readBytes, rightDc);
     rightHist1 = rightDc->hist1;
     rightHist2 = rightDc->hist2;
   }
   int bytesLeft = fileSize - left.tellg();
-  writeBlockHeader(outfile, bytesLeft, true);
+  writeBlockHeader(outfile, bytesLeft, &loopBlock);
   writeDecoderState(left, outfile, leftHist1, leftHist2);
   writeDecoderState(right, outfile, rightHist1, rightHist2);
   writePad(outfile);
