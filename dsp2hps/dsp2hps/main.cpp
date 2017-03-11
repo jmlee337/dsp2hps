@@ -14,9 +14,15 @@ namespace po = boost::program_options;
 namespace en = boost::endian;
 
 const en::big_uint32_t kDefaultSampleRate = 32000;
+
+// must be divisible by 64
 const int kBlockSize = 0x00010000;
-const int kReadSize = kBlockSize / 2;
 const int kBytesPerBlock = kBlockSize + 0x20;
+const int kReadSize = kBlockSize / 2;
+
+// kReadSize is divisible by 32, so no fraction will be truncated here
+// will be a multiple of 56
+const int kSamplesPerBlock = kReadSize * 14 / 8;
 
 struct DecodeCoefficients {
   en::big_int16_t decodeCoeffs[16];
@@ -101,6 +107,7 @@ DecodeCoefficients *writeChannelInfo(ifstream &dsp, ofstream &outfile) {
 // Does not mutate istream position
 // loopPoint specifies that this is the last block in the file and where to loop to if not null.
 void writeBlockHeader(ofstream &outfile, int readBytes, en::big_uint32_t *loopBlock) {
+  cout << "block: 0x" << hex << outfile.tellp() << dec;
   if (loopBlock) {
     en::big_uint32_t dataLength = calculatePadded(readBytes) * 2;
     char *dataLengthBytes = (char *)&dataLength;
@@ -112,6 +119,9 @@ void writeBlockHeader(ofstream &outfile, int readBytes, en::big_uint32_t *loopBl
 
     char *nextBlockBytes = (char *)loopBlock;
     outfile.write(nextBlockBytes, 4);
+
+    cout << " length: 0x" << hex << dataLength << dec << endl;
+    cout << "loop: 0x" << hex << *loopBlock << dec << endl;
   } else {
     streampos pos = outfile.tellp();
 
@@ -126,6 +136,8 @@ void writeBlockHeader(ofstream &outfile, int readBytes, en::big_uint32_t *loopBl
     en::big_uint32_t nextBlock = (int)pos + 0x20 + dataLength;
     char *nextBlockBytes = (char *)&nextBlock;
     outfile.write(nextBlockBytes, 4);
+
+    cout << " length: 0x" << hex << dataLength << dec << endl;
   }
 }
 
@@ -162,7 +174,7 @@ void writePad(ofstream &outfile) {
   outfile.write(padBytes, 4);
 }
 
-void *writeBlockData(ifstream &dsp, ofstream &outfile, int readBytes, DecodeCoefficients *dc) {
+void writeBlockData(ifstream &dsp, ofstream &outfile, int readBytes, DecodeCoefficients *dc) {
   int paddedLength = calculatePadded(readBytes);
   char *dspFrames = new char[paddedLength]();
   dsp.read(dspFrames, readBytes);
@@ -219,7 +231,6 @@ void *writeBlockData(ifstream &dsp, ofstream &outfile, int readBytes, DecodeCoef
   }
   
   delete dspFrames;
-  return 0;
 }
 
 void validateDSPFiles(ifstream &left, ifstream &right) {
@@ -262,19 +273,17 @@ en::big_uint32_t calculateLoopBlock(double loopPoint, en::big_uint32_t sampleRat
   loopSample = loopSample + (56 / 2);
   loopSample -= loopSample % 56;
 
-  // (kReadSize must be a multiple of 32, so no fraction can be truncated here)
-  // (samplesPerBlock will be a multiple of 56)
-  int samplesPerBlock = kReadSize * 14 / 8;
-
-  int blockBefore = floor(loopSample / samplesPerBlock);
+  int blockBefore = floor(loopSample / kSamplesPerBlock);
   int addressBefore = blockBefore * kBytesPerBlock + 0x80;
 
-  // remainingSamples will be a multiple of 56
-  // remainingBytes will be a multiple of 32
-  int remainingSamples = loopSample % samplesPerBlock;
-  int remainingBytes = 0x20 + (2 * (remainingSamples * 8 / 14));
-
-  return addressBefore + remainingBytes;
+  // blockBeforeSamples will be a multiple of 56
+  int blockBeforeSamples = loopSample % kSamplesPerBlock;
+  if (blockBeforeSamples == 0) {
+	  return addressBefore;
+  }
+  // blockBeforeBytes will be a multiple of 32
+  int blockBeforeBytes = 0x20 + (2 * (blockBeforeSamples * 8 / 14));
+  return addressBefore + blockBeforeBytes;
 }
 
 int main(int argc, char *argv[]) {
@@ -400,13 +409,14 @@ int main(int argc, char *argv[]) {
     rightHist1 = rightDc->hist1;
     rightHist2 = rightDc->hist2;
   }
+
   int bytesLeft = fileSize - left.tellg();
   writeBlockHeader(outfile, bytesLeft, &loopBlock);
   writeDecoderState(left, outfile, leftHist1, leftHist2);
   writeDecoderState(right, outfile, rightHist1, rightHist2);
   writePad(outfile);
-  delete writeBlockData(left, outfile, bytesLeft, leftDc);
-  delete writeBlockData(right, outfile, bytesLeft, rightDc);
+  writeBlockData(left, outfile, bytesLeft, leftDc);
+  writeBlockData(right, outfile, bytesLeft, rightDc);
 
   left.close();
   right.close();
