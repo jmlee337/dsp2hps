@@ -30,6 +30,14 @@ That's so easy! What's the catch??
 
 * you still have to make sure your source audio file loops correctly
 
+## **How to build**
+You need:
+
+* Visual Studio 2015 (or compatible version? I used 2015)
+* an installation of [boost](http://www.boost.org/doc/libs/1_63_0/more/getting_started/windows.html)
+
+You have to set up Visual Studio to include and link to boost as described in the getting started link.
+
 ## **What are you working on next?**
 
 * ~~rewriting all the main.asm + assembler business in an actual programming language to make the world a little more sane~~
