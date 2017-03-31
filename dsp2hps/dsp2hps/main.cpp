@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <iostream>
 #include <string.h>
+#include <regex>
 #include <Windows.h>
 #include <boost/endian/arithmetic.hpp>
 #include <boost/program_options.hpp>
@@ -312,7 +313,8 @@ int main(int argc, char *argv[]) {
     if (!vm.count("sample_rate")) {
       sampleRate = kDefaultSampleRate;
     }
-  } catch (po::error &e) {
+  }
+  catch (po::error &e) {
     cerr << e.what() << endl << endl;
     cerr << desc << endl;
     return -1;
@@ -378,10 +380,16 @@ int main(int argc, char *argv[]) {
   en::big_int16_t rightHist1 = rightDc->hist1;
   en::big_int16_t rightHist2 = rightDc->hist2;
 
-  en::big_uint32_t loopBlock = 0x80;
-  if (vm.count("loop_point")) {
-    loopBlock = calculateLoopBlock(loopPoint, sampleRate);
+  double actualLoopPoint = 0;
+  smatch loopFloatMatch;
+  if (regex_search(leftFileName, loopFloatMatch, regex("LOOP[0-9]*\\.?[0-9]+"))) {
+    string floatMatch = loopFloatMatch[0];
+    actualLoopPoint = stod(floatMatch.substr(4));
+  } else if (vm.count("loop_point")) {
+    actualLoopPoint = loopPoint;
   }
+  cout << "Using loop point: " << actualLoopPoint << endl;
+  en::big_uint32_t loopBlock = calculateLoopBlock(actualLoopPoint, sampleRate);
   int numBlocks = calculateNumBlocks(fileSize, loopBlock);
 
   // Block Format
