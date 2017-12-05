@@ -30,6 +30,9 @@ That's so easy! What's the catch??
 
 * you still have to make sure your source audio file loops correctly
 
+## **MSVCP140.dll**
+If you see an error message about MSVCP140.dll, download and install [Visual C++ Redistributable for Visual Studio 2015 (x86)](https://www.microsoft.com/en-us/download/details.aspx?id=48145). Make sure you get x86 and *not* x64.
+
 ## **How to build**
 You need:
 
