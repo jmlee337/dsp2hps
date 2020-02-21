@@ -7,8 +7,8 @@ seriously, it now literally takes **5 seconds** to go from audiofile.anyformat t
 ## **How do I use this?**
 vids:
 
-* [normal loops](https://drive.google.com/open?id=0B79OwbM8T752Ukp6NUdpNlNlLTg)
-* [custom loops](https://drive.google.com/open?id=0B79OwbM8T752TkVIR1JiOXJFd2M)
+* [normal loops](https://youtu.be/Sz4pIHZmFoE)
+* [custom loops](https://youtu.be/ueb8M9II_8g)
 
 normal loops:
 
